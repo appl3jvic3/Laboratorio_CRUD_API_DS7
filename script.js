@@ -90,8 +90,6 @@ async function fetchWithToken(url, options = {}) {
         mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
     }
     
-    console.log('📡 Enviando petición con token:', token ? '✅ Sí' : '❌ No');
-    
     return fetch(url, mergedOptions);
 }
 
@@ -121,17 +119,14 @@ function validarTextoSeguro(texto) {
 
 async function listarProductos() {
     const tbody = document.getElementById('tablaProductos');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando productos...</td></tr>';
+    tbody.innerHTML = '';
     
     try {
         token = localStorage.getItem('jwt_token') || '';
         if (!token) {
-            console.warn('⚠️ No hay token, mostrando login');
             mostrarLogin();
             return;
         }
-        
-        console.log('📡 Listando productos...');
         
         const formData = new URLSearchParams();
         formData.append('accion', 'Listar');
@@ -165,7 +160,7 @@ async function listarProductos() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center text-danger">
-                    Error al cargar productos: ${error.message}
+                    Error: ${error.message}
                 </td>
             </tr>
         `;
@@ -174,7 +169,7 @@ async function listarProductos() {
 }
 
 // ============================================
-// 6. RENDERIZAR TABLA (FUNCIÓN REUTILIZABLE)
+// 6. RENDERIZAR TABLA
 // ============================================
 
 function renderizarTabla(productos, mensaje = '') {
@@ -188,7 +183,6 @@ function renderizarTabla(productos, mensaje = '') {
             </tr>
         `;
         contador.textContent = '0 productos';
-        // También actualizar el contador del header si existe
         const headerContador = document.getElementById('contadorProductosHeader');
         if (headerContador) headerContador.textContent = '0 productos';
         return;
@@ -439,20 +433,23 @@ async function eliminarProducto(id) {
 
 /**
  * Busca productos por ID, nombre o código
+ * Muestra mensajes de retroalimentación específicos
  */
 async function buscarProductos() {
     const termino = document.getElementById('buscarInput').value.trim();
     console.log('🔍 Buscando término:', termino);
     const tbody = document.getElementById('tablaProductos');
     
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">🔍 Buscando...</td></tr>';
+    // Si el campo está vacío, mostrar mensaje y salir
+    if (!termino) {
+        Swal.fire('Información', 'Escribe un término de búsqueda (ID, código o nombre)', 'info');
+        return;
+    }
 
     try {
         const formData = new URLSearchParams();
         formData.append('accion', 'BuscarProductos');
-        if (termino) {
-            formData.append('termino', termino);
-        }
+        formData.append('termino', termino);
 
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -472,35 +469,76 @@ async function buscarProductos() {
         const result = await response.json();
         console.log('📡 Resultado búsqueda:', result);
 
-        if (result.success) {
-            renderizarTabla(result.data, result.message);
+        // RENDERIZAR RESULTADOS
+        if (result.success && result.data && result.data.length > 0) {
+            // PRODUCTOS ENCONTRADOS
+            renderizarTabla(result.data);
             document.getElementById('contadorProductos').textContent = result.message;
+            document.getElementById('btnLimpiarBusqueda').classList.remove('d-none');
             
-            if (termino) {
-                document.getElementById('btnLimpiarBusqueda').classList.remove('d-none');
-            } else {
-                document.getElementById('btnLimpiarBusqueda').classList.add('d-none');
-            }
+            // Mostrar mensaje de éxito con SweetAlert
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Productos encontrados',
+                text: result.message,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } else if (result.success && result.data && result.data.length === 0) {
+            // NO SE ENCONTRARON PRODUCTOS
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <div class="alert alert-warning m-0">
+                            <strong>🔍 No se encontraron productos</strong><br>
+                            No hay coincidencias para "<strong>${termino}</strong>"
+                        </div>
+                    </td>
+                </tr>
+            `;
+            document.getElementById('contadorProductos').textContent = '0 productos';
+            document.getElementById('btnLimpiarBusqueda').classList.remove('d-none');
+            
+            // Mostrar mensaje de no encontrado con SweetAlert
+            Swal.fire({
+                icon: 'info',
+                title: '🔍 Producto no encontrado',
+                text: `No se encontraron productos que coincidan con "${termino}"`,
+                timer: 3000,
+                showConfirmButton: false
+            });
         } else {
-            throw new Error(result.message || 'Error al buscar');
+            // ERROR EN LA BÚSQUEDA
+            throw new Error(result.message || 'Error al buscar productos');
         }
     } catch (error) {
         console.error('❌ Error en buscarProductos:', error);
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center text-danger">
-                    Error: ${error.message}
+                    <strong>❌ Error:</strong> ${error.message}
                 </td>
             </tr>
         `;
-        Swal.fire('Error', 'No se pudo completar la búsqueda', 'error');
+        Swal.fire('Error', 'No se pudo completar la búsqueda: ' + error.message, 'error');
     }
 }
 
+/**
+ * Limpia la búsqueda y recarga todos los productos
+ */
 function limpiarBusqueda() {
     document.getElementById('buscarInput').value = '';
     document.getElementById('btnLimpiarBusqueda').classList.add('d-none');
+    document.getElementById('contadorProductos').textContent = 'Cargando...';
     listarProductos();
+    Swal.fire({
+        icon: 'info',
+        title: '🔄 Lista completa',
+        text: 'Mostrando todos los productos',
+        timer: 1500,
+        showConfirmButton: false
+    });
 }
 
 // ============================================
@@ -538,21 +576,40 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarLogin();
     }
 
-    // === EVENTOS DE BÚSQUEDA (AHORA DENTRO DE DOMContentLoaded) ===
-    document.getElementById('btnBuscar').addEventListener('click', buscarProductos);
+    // === EVENTOS DE BÚSQUEDA ===
+    const btnBuscar = document.getElementById('btnBuscar');
+    const buscarInput = document.getElementById('buscarInput');
+    const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+    const btnRecargar = document.getElementById('btnRecargar');
 
-    document.getElementById('buscarInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            buscarProductos();
-        }
-    });
+    if (btnBuscar) {
+        btnBuscar.addEventListener('click', buscarProductos);
+        console.log('✅ Evento de búsqueda asignado');
+    } else {
+        console.error('❌ Botón de búsqueda no encontrado');
+    }
 
-    document.getElementById('btnLimpiarBusqueda').addEventListener('click', limpiarBusqueda);
+    if (buscarInput) {
+        buscarInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                buscarProductos();
+            }
+        });
+        console.log('✅ Evento Enter asignado');
+    }
 
-    document.getElementById('btnRecargar').addEventListener('click', () => {
-        document.getElementById('buscarInput').value = '';
-        document.getElementById('btnLimpiarBusqueda').classList.add('d-none');
-        listarProductos();
-    });
+    if (btnLimpiar) {
+        btnLimpiar.addEventListener('click', limpiarBusqueda);
+        console.log('✅ Evento limpiar asignado');
+    }
+
+    if (btnRecargar) {
+        btnRecargar.addEventListener('click', () => {
+            document.getElementById('buscarInput').value = '';
+            document.getElementById('btnLimpiarBusqueda').classList.add('d-none');
+            listarProductos();
+        });
+        console.log('✅ Evento recargar asignado');
+    }
 });
