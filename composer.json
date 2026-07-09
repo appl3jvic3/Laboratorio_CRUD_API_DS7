@@ -1,0 +1,9 @@
+{
+    "name": "danco/api-php",
+    "description": "Laboratorio CRUD con JWT",
+    "type": "project",
+    "require": {
+        "firebase/php-jwt": "^7.1"
+    },
+    "license": "MIT"
+}
