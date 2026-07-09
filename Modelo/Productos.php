@@ -20,7 +20,7 @@ class Producto
         // Sanitizar con la clase Sanitizador
         $sanitizados = Sanitizador::sanitizarArray($datos, [
             'codigo' => 'codigo',
-            'producto' => 'texto',
+            'producto' => 'nombreProducto',
             'precio' => 'precio',
             'cantidad' => 'cantidad'
         ]);
@@ -51,7 +51,7 @@ class Producto
         // Sanitizar con la clase Sanitizador
         $sanitizados = Sanitizador::sanitizarArray($datos, [
             'codigo' => 'codigo',
-            'producto' => 'texto',
+            'producto' => 'nombreProducto',
             'precio' => 'precio',
             'cantidad' => 'cantidad'
         ]);

@@ -25,7 +25,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
     try {
         console.log('📡 Intentando login...');
-        
+
         const response = await fetch(LOGIN_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -39,7 +39,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             token = data.token;
             localStorage.setItem('jwt_token', token);
             console.log('✅ Token guardado:', token.substring(0, 30) + '...');
-            
+
             Swal.fire('Éxito', 'Login exitoso', 'success');
             mostrarCRUD();
             listarProductos();
@@ -69,32 +69,7 @@ function mostrarLogin() {
 }
 
 // ============================================
-// 3. FETCH CON TOKEN
-// ============================================
-
-async function fetchWithToken(url, options = {}) {
-    if (!token) {
-        token = localStorage.getItem('jwt_token') || '';
-    }
-    
-    const defaultOptions = {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-    };
-    
-    const mergedOptions = { ...defaultOptions, ...options };
-    
-    if (options.headers) {
-        mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
-    }
-    
-    return fetch(url, mergedOptions);
-}
-
-// ============================================
-// 4. VALIDACIÓN DE CARACTERES PELIGROSOS
+// 3. VALIDACIÓN DE CARACTERES PELIGROSOS
 // ============================================
 
 function validarTextoSeguro(texto) {
@@ -104,7 +79,7 @@ function validarTextoSeguro(texto) {
         /\bSELECT\b/i, /\bINSERT\b/i, /\bUPDATE\b/i, /\bDELETE\b/i,
         /\bDROP\b/i, /\bUNION\b/i,
     ];
-    
+
     for (let patron of patronesPeligrosos) {
         if (patron.test(texto)) {
             return false;
@@ -114,30 +89,25 @@ function validarTextoSeguro(texto) {
 }
 
 // ============================================
-// 5. LISTAR PRODUCTOS
+// 4. LISTAR PRODUCTOS (GET)
 // ============================================
 
 async function listarProductos() {
     const tbody = document.getElementById('tablaProductos');
     tbody.innerHTML = '';
-    
+
     try {
         token = localStorage.getItem('jwt_token') || '';
         if (!token) {
             mostrarLogin();
             return;
         }
-        
-        const formData = new URLSearchParams();
-        formData.append('accion', 'Listar');
-        
+
         const response = await fetch(API_URL, {
-            method: 'POST',
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: formData
         });
 
         if (response.status === 401) {
@@ -169,7 +139,7 @@ async function listarProductos() {
 }
 
 // ============================================
-// 6. RENDERIZAR TABLA
+// 5. RENDERIZAR TABLA
 // ============================================
 
 function renderizarTabla(productos, mensaje = '') {
@@ -218,7 +188,7 @@ function renderizarTabla(productos, mensaje = '') {
 }
 
 // ============================================
-// 7. GUARDAR / MODIFICAR (CON SWITCH)
+// 6. GUARDAR / MODIFICAR (CON SWITCH, POST o PUT)
 // ============================================
 
 document.getElementById('productForm').addEventListener('submit', async (e) => {
@@ -270,22 +240,17 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 });
 
 async function procesarProducto(accion, id, datos) {
-    const formData = new URLSearchParams();
-    formData.append('accion', accion);
-    formData.append('codigo', datos.codigo);
-    formData.append('producto', datos.producto);
-    formData.append('precio', datos.precio);
-    formData.append('cantidad', datos.cantidad);
-    if (id) formData.append('id', id);
+    const metodo = accion === 'Modificar' ? 'PUT' : 'POST';
+    const body = JSON.stringify(id ? { id, ...datos } : datos);
 
     try {
         const response = await fetch(API_URL, {
-            method: 'POST',
+            method: metodo,
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: formData
+            body
         });
 
         if (response.status === 401) {
@@ -316,22 +281,16 @@ async function procesarProducto(accion, id, datos) {
 }
 
 // ============================================
-// 8. CARGAR PARA EDITAR
+// 7. CARGAR PARA EDITAR (GET por id)
 // ============================================
 
 async function cargarParaEditar(id) {
     try {
-        const formData = new URLSearchParams();
-        formData.append('accion', 'Buscar');
-        formData.append('id', id);
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
+        const response = await fetch(`${API_URL}?id=${id}`, {
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: formData
         });
 
         if (response.status === 401) {
@@ -362,7 +321,7 @@ async function cargarParaEditar(id) {
 }
 
 // ============================================
-// 9. RESETEAR FORMULARIO
+// 8. RESETEAR FORMULARIO
 // ============================================
 
 document.getElementById('btnCancelar').addEventListener('click', resetForm);
@@ -376,7 +335,7 @@ function resetForm() {
 }
 
 // ============================================
-// 10. ELIMINAR PRODUCTO
+// 9. ELIMINAR PRODUCTO (DELETE)
 // ============================================
 
 async function eliminarProducto(id) {
@@ -394,17 +353,11 @@ async function eliminarProducto(id) {
     if (!confirm.isConfirmed) return;
 
     try {
-        const formData = new URLSearchParams();
-        formData.append('accion', 'Eliminar');
-        formData.append('id', id);
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
+        const response = await fetch(`${API_URL}?id=${id}`, {
+            method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: formData
         });
 
         if (response.status === 401) {
@@ -428,36 +381,32 @@ async function eliminarProducto(id) {
 }
 
 // ============================================
-// 11. FUNCIONES DE BÚSQUEDA
+// 10. FUNCIONES DE BÚSQUEDA (GET con ?buscar=)
 // ============================================
 
-/**
- * Busca productos por ID, nombre o código
- * Muestra mensajes de retroalimentación específicos
- */
 async function buscarProductos() {
     const termino = document.getElementById('buscarInput').value.trim();
     console.log('🔍 Buscando término:', termino);
     const tbody = document.getElementById('tablaProductos');
-    
-    // Si el campo está vacío, mostrar mensaje y salir
+
     if (!termino) {
         Swal.fire('Información', 'Escribe un término de búsqueda (ID, código o nombre)', 'info');
         return;
     }
 
     try {
-        const formData = new URLSearchParams();
-        formData.append('accion', 'BuscarProductos');
-        formData.append('termino', termino);
+        // Si el término es numérico, se busca directo por id (?id=)
+        // Si no, se busca por código/nombre (?buscar=)
+        const esId = /^\d+$/.test(termino);
+        const url = esId
+            ? `${API_URL}?id=${encodeURIComponent(termino)}`
+            : `${API_URL}?buscar=${encodeURIComponent(termino)}`;
 
-        const response = await fetch(API_URL, {
-            method: 'POST',
+        const response = await fetch(url, {
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: formData
         });
 
         if (response.status === 401) {
@@ -469,14 +418,16 @@ async function buscarProductos() {
         const result = await response.json();
         console.log('📡 Resultado búsqueda:', result);
 
-        // RENDERIZAR RESULTADOS
-        if (result.success && result.data && result.data.length > 0) {
-            // PRODUCTOS ENCONTRADOS
-            renderizarTabla(result.data);
+        // Cuando se busca por id, el backend devuelve un solo objeto en "data"
+        const data = esId && result.data && !Array.isArray(result.data)
+            ? [result.data]
+            : result.data;
+
+        if (result.success && data && data.length > 0) {
+            renderizarTabla(data);
             document.getElementById('contadorProductos').textContent = result.message;
             document.getElementById('btnLimpiarBusqueda').classList.remove('d-none');
-            
-            // Mostrar mensaje de éxito con SweetAlert
+
             Swal.fire({
                 icon: 'success',
                 title: '✅ Productos encontrados',
@@ -484,8 +435,7 @@ async function buscarProductos() {
                 timer: 2000,
                 showConfirmButton: false
             });
-        } else if (result.success && result.data && result.data.length === 0) {
-            // NO SE ENCONTRARON PRODUCTOS
+        } else {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" class="text-center">
@@ -498,8 +448,7 @@ async function buscarProductos() {
             `;
             document.getElementById('contadorProductos').textContent = '0 productos';
             document.getElementById('btnLimpiarBusqueda').classList.remove('d-none');
-            
-            // Mostrar mensaje de no encontrado con SweetAlert
+
             Swal.fire({
                 icon: 'info',
                 title: '🔍 Producto no encontrado',
@@ -507,9 +456,6 @@ async function buscarProductos() {
                 timer: 3000,
                 showConfirmButton: false
             });
-        } else {
-            // ERROR EN LA BÚSQUEDA
-            throw new Error(result.message || 'Error al buscar productos');
         }
     } catch (error) {
         console.error('❌ Error en buscarProductos:', error);
@@ -524,9 +470,6 @@ async function buscarProductos() {
     }
 }
 
-/**
- * Limpia la búsqueda y recarga todos los productos
- */
 function limpiarBusqueda() {
     document.getElementById('buscarInput').value = '';
     document.getElementById('btnLimpiarBusqueda').classList.add('d-none');
@@ -542,7 +485,7 @@ function limpiarBusqueda() {
 }
 
 // ============================================
-// 12. CERRAR SESIÓN
+// 11. CERRAR SESIÓN
 // ============================================
 
 document.getElementById('btnLogout').addEventListener('click', () => {
@@ -560,13 +503,12 @@ document.getElementById('btnLogout').addEventListener('click', () => {
 });
 
 // ============================================
-// 13. CARGA INICIAL Y EVENTOS
+// 12. CARGA INICIAL Y EVENTOS
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicialización
     token = localStorage.getItem('jwt_token') || '';
-    
+
     if (token) {
         console.log('✅ Token encontrado en localStorage');
         mostrarCRUD();
@@ -576,7 +518,6 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarLogin();
     }
 
-    // === EVENTOS DE BÚSQUEDA ===
     const btnBuscar = document.getElementById('btnBuscar');
     const buscarInput = document.getElementById('buscarInput');
     const btnLimpiar = document.getElementById('btnLimpiarBusqueda');

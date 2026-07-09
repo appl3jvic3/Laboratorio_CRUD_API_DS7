@@ -33,58 +33,50 @@ class Sanitizador
         '/\bDELETE\b/i',
         '/\bDROP\b/i',
         '/\bUNION\b/i',
-        '/\bEXEC\b/i',
-        '/\bXP_/i',
     ];
-    
+
     // ============================================
     // MÉTODOS DE SANITIZACIÓN
     // ============================================
 
     /**
-     * Sanitiza texto general (nombres, descripciones, etc.)
-     * Elimina HTML, scripts y caracteres especiales no permitidos
+     * Sanitiza texto genérico
+     * Elimina etiquetas HTML y caracteres peligrosos
      * 
      * @param string $texto Texto a sanitizar
-     * @param bool $capitalizar Si debe capitalizar las palabras (true por defecto)
      * @param string $default Valor por defecto si queda vacío
      * @return string Texto sanitizado
      */
-    public static function texto($texto, $capitalizar = true, $default = 'Sin nombre')
+    public static function texto($texto, $default = '')
     {
-        // Convertir a string por si acaso
         $texto = (string) $texto;
-
-        // 1. Eliminar espacios al inicio y final
         $texto = trim($texto);
-
-        // 2. Eliminar etiquetas HTML
         $texto = strip_tags($texto);
-
-        // 3. Convertir entidades HTML
-        $texto = htmlspecialchars($texto, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        // 4. Eliminar caracteres de control invisibles
-        $texto = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $texto);
-
-        // 5. Eliminar caracteres no permitidos
-        // Solo permite: letras (acentos y ñ), números, espacios, guiones, puntos, ampersand y signos de exclamación/interrogación
-        $texto = preg_replace('/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s\.\-&!¿?¡]/', '', $texto);
-
-        // 6. Eliminar espacios múltiples
+        $texto = htmlspecialchars($texto, ENT_QUOTES, 'UTF-8');
         $texto = preg_replace('/\s+/', ' ', $texto);
 
-        // 7. Capitalizar palabras
-        if ($capitalizar) {
-            $texto = ucwords(strtolower($texto));
-        }
-
-        // 8. Si quedó vacío, usar valor por defecto
+        // Si quedó vacío, usar valor por defecto
         if (empty($texto) || trim($texto) === '') {
             $texto = $default;
         }
 
         return trim($texto);
+    }
+
+    public static function nombreProducto($texto, $default = '')
+    {
+    // Reutiliza la sanitización de texto genérico
+    $texto = self::texto($texto, $default);
+
+    if (empty($texto)) {
+        return $texto;
+    }
+
+    // mb_ para soportar tildes/ñ correctamente
+    $primeraLetra = mb_strtoupper(mb_substr($texto, 0, 1, 'UTF-8'), 'UTF-8');
+    $resto = mb_substr($texto, 1, null, 'UTF-8');
+
+    return $primeraLetra . $resto;
     }
 
     /**
@@ -154,6 +146,21 @@ class Sanitizador
         }
 
         return $cantidad;
+    }
+
+    /**
+     * Sanitiza IDs de base de datos
+     * A diferencia de cantidad(), NO fuerza un mínimo de 1:
+     * si el id es inválido devuelve 0, para que el llamador
+     * pueda detectar el caso y responder 400/404.
+     * 
+     * @param mixed $id Id a sanitizar
+     * @return int Id sanitizado (0 si es inválido)
+     */
+    public static function id($id)
+    {
+        $id = intval($id);
+        return $id > 0 ? $id : 0;
     }
 
     /**
@@ -282,6 +289,9 @@ class Sanitizador
             }
 
             switch ($regla) {
+                case 'nombreProducto':
+                    $sanitizados[$campo] = self::nombreProducto($valor);
+                    break;
                 case 'texto':
                     $sanitizados[$campo] = self::texto($valor);
                     break;
@@ -293,6 +303,9 @@ class Sanitizador
                     break;
                 case 'cantidad':
                     $sanitizados[$campo] = self::cantidad($valor);
+                    break;
+                case 'id':
+                    $sanitizados[$campo] = self::id($valor);
                     break;
                 case 'email':
                     $sanitizados[$campo] = self::email($valor);
